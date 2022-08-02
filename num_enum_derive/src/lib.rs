@@ -178,6 +178,7 @@ struct VariantInfo {
     is_default: bool,
     is_catch_all: bool,
     is_num: bool,
+    fields: Fields,
     num_value: Option<LitInt>,
     canonical_value: Expr,
     alternative_values: Vec<Expr>,
@@ -231,6 +232,10 @@ impl EnumInfo {
         self.variants
             .iter()
             .find_map(|info| info.attr_spans.default.first())
+    }
+
+    fn variant_fields(&self) -> Vec<Fields> {
+        self.variants.iter().map(|var| var.fields.clone()).collect()
     }
 
     fn first_alternatives_attr_span(&self) -> Option<&Span> {
@@ -466,7 +471,7 @@ impl Parse for EnumInfo {
                     }
                 }
 
-                if !is_catch_all {
+                if !is_catch_all && !is_num {
                     match &variant.fields {
                         Fields::Named(_) | Fields::Unnamed(_) => {
                             die!(variant => format!("`{}` only supports unit variants (with no associated data), but `{}::{}` was not a unit variant.", get_crate_name(), name, ident));
@@ -483,6 +488,7 @@ impl Parse for EnumInfo {
                     is_default,
                     is_catch_all,
                     is_num,
+                    fields: variant.fields.clone(),
                     num_value,
                     canonical_value,
                     alternative_values,
@@ -556,13 +562,43 @@ pub fn derive_into_primitive(input: TokenStream) -> TokenStream {
             })
         }
         EnumAttr::Num(num) => {
-            let variant_idents: Vec<Ident> = enum_info.variant_idents();
+            let variant_idents = enum_info.variant_idents();
+            let variant_fields = enum_info.variant_fields();
             let num_lits = enum_info.variant_num();
+
+            let idents = variant_idents
+                .iter()
+                .zip(variant_fields.iter())
+                .map(|(ident, fields)| {
+                    // let field_idents = fields.iter().collect::<Vec<_>>();
+                    match fields {
+                        Fields::Named(named) => {
+                            let names = named.named.iter().collect::<Vec<_>>();
+                            quote! {
+                                #ident { #( #names : _ , )* }
+                            }
+                        }
+                        Fields::Unnamed(unnamed) => {
+                            let names = unnamed
+                                .unnamed
+                                .iter()
+                                .map(|_| quote! { _ })
+                                .collect::<Vec<_>>();
+                            quote! {
+                                #ident ( #( #names, )* )
+                            }
+                        }
+                        Fields::Unit => quote! {
+                            #ident
+                        },
+                    }
+                })
+                .collect::<Vec<_>>();
             let body = if let Some(catch_all_ident) = catch_all {
                 quote! {
                     match enum_value {
                         #(
-                            #name::#variant_idents => #num_lits,
+                            #name::#idents => #num_lits,
                         )*
                         #name::#catch_all_ident(raw) => raw,
                     }
