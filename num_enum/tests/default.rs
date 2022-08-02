@@ -66,6 +66,8 @@ fn default_catch_all_into_prim() {
         One(u16),
         #[num_enum(num = 2)]
         Two,
+        #[num_enum(num = 5)]
+        Five { a: Vec<u8> },
         #[num_enum(num = 3)]
         Three(String, String),
         #[num_enum(num = 8)]
@@ -75,6 +77,7 @@ fn default_catch_all_into_prim() {
     }
     assert_eq!(u8::from(Foo::One(3)), 1_u8);
     assert_eq!(u8::from(Foo::Two), 2_u8);
+    assert_eq!(u8::from(Foo::Five { a: b"b".to_vec() }), 5_u8);
     assert_eq!(
         u8::from(Foo::Three("foo".to_string(), "a".to_string())),
         3_u8

@@ -573,7 +573,11 @@ pub fn derive_into_primitive(input: TokenStream) -> TokenStream {
                     // let field_idents = fields.iter().collect::<Vec<_>>();
                     match fields {
                         Fields::Named(named) => {
-                            let names = named.named.iter().collect::<Vec<_>>();
+                            let names = named
+                                .named
+                                .iter()
+                                .filter_map(|n| n.ident.clone())
+                                .collect::<Vec<_>>();
                             quote! {
                                 #ident { #( #names : _ , )* }
                             }
