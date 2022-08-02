@@ -61,6 +61,4 @@ mod mixed {
     }
 }
 
-fn main() {
-
-}
+fn main() {}
